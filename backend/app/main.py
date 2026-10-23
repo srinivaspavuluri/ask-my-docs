@@ -1,0 +1,62 @@
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+from ollama import Client
+from app.config import OLLAMA_HOST
+from app.db import get_db_connection
+from app.ingestion import ingest_document
+
+
+ollama_client = Client(host=OLLAMA_HOST)
+MAX_UPLOAD_BYTES = 1 * 1024 * 1024
+
+app = FastAPI(title="Ask My Docs",
+              description=("A grounded question-answering API using PostgreSQL, pgvector and Ollama."),
+                  version="1.0.0"
+              )
+
+
+@app.post("/documents")
+def upload_document(file: UploadFile = File(...), title: str | None = Form(None)):
+    if not file.filename or not file.filename.lower().endswith(".txt"):
+        raise HTTPException(status_code=400, detail="Only .txt files are supported.")
+    raw = file.file.read()
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large, Max 1MB allowed.")
+    try:
+        data = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File content must be UTF-8 compatible.")
+
+    source = file.filename
+    doc_title = title or file.filename
+    try:
+        result = ingest_document(source=source, title=doc_title, content=data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    status_code = 201 if result["status"] == "ingested" else 200
+    return JSONResponse(status_code=status_code, content=result)
+
+
+@app.get("/health")
+def health_check():
+    result = {"database": None, "ollama": None}
+    connection = None
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+        result["database"] = "ok"
+    except Exception as e:
+        result["database"] = f"error: {e}"
+    finally:
+        if connection is not None:
+            connection.close()
+
+    try:
+        ollama_client.list()
+        result["ollama"] = "ok"
+    except Exception as e:
+        result["ollama"] = f"error: {e}"
+
+    return result
+
