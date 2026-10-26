@@ -33,7 +33,7 @@ def upload_document(file: UploadFile = File(...), title: str | None = Form(None)
         result = ingest_document(source=source, title=doc_title, content=data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    status_code = 201 if result["status"] == "ingested" else 200
+    status_code = {"ingested": 201, "conflict": 409}.get(result["status"], 200)
     return JSONResponse(status_code=status_code, content=result)
 
 

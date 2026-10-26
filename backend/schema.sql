@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS public.documents (
     title        TEXT,
     content_hash TEXT NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT documents_source_hash_unique UNIQUE (source, content_hash)
+    -- CONSTRAINT documents_source_hash_unique UNIQUE (source, content_hash)
+    CONSTRAINT documents_source_unique UNIQUE (source)
 );
 
 -- Child: ordered chunks with 384-dim embeddings (all-MiniLM-L6-v2)
