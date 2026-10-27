@@ -1,3 +1,5 @@
+
+import os
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Response
 from fastapi.responses import JSONResponse
 from ollama import Client
@@ -9,6 +11,7 @@ from app.documents import list_documents, remove_document
 
 ollama_client = Client(host=OLLAMA_HOST)
 MAX_UPLOAD_BYTES = 1 * 1024 * 1024
+ALLOWED_EXTENSIONS = {".txt", ".md"}
 
 app = FastAPI(title="Ask My Docs",
               description=("A grounded question-answering API using PostgreSQL, pgvector and Ollama."),
@@ -18,8 +21,10 @@ app = FastAPI(title="Ask My Docs",
 
 @app.post("/documents")
 def upload_document(file: UploadFile = File(...), title: str | None = Form(None)):
-    if not file.filename or not file.filename.lower().endswith(".txt"):
-        raise HTTPException(status_code=400, detail="Only .txt files are supported.")
+    extension = os.path.splitext(file.filename or "")[1].lower()
+    if extension not in ALLOWED_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
+        raise HTTPException(status_code=400, detail=f"Only {allowed} extensions are allowed.")
     raw = file.file.read()
     if len(raw) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File too large, Max 1MB allowed.")
