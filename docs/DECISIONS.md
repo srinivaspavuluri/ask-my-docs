@@ -87,6 +87,20 @@ Other exceptions are NOT caught (a DB down is an honest 500). The endpoint uses 
 **Proved by:** 9 passing; each group failed when the rule was broken.
 **Lesson:** adding `.pdf` to the allowed set made a test **ingest `notes.pdf` into the real database** (201). Validation tests are only DB-safe while validation works → use a separate test database for DB tests.
 
+## 010 — Retrieval threshold vs chunk context
+
+**Problem:** For "How do I fix KubePodCrashLooping?", only chunk 0 (the title, no fix) was returned. The fix (chunk 2, "## Mitigation") was cut by the 0.5 threshold at 0.554, because it doesn't contain the alert name: chunking separated the subject from its answer. Same for Ollama: "It exposes... port 11434" = 0.521, cut.
+
+**Decision:** Keep the threshold at 0.5 for now. In Phase 7, add the document name and section to the front of each chunk ("crashloop.md > Mitigation: ...") so the answer chunk contains its subject. Measure with the Phase 3b evals: baseline now, compare after. Keep it only if the numbers improve.
+
+**Why not:** Raising the threshold (e.g. 0.6). It changes every query: more chunks pass, including ones that shouldn't (similar wording from other runbooks), and this gets worse as the corpus grows. It would also be tuned on just 2 questions, and it hides the cause instead of fixing it: the answer chunk still lacks its subject.
+
+**Recipe:** embed the question (384 numbers) → compare with every chunk's embedding using `<=>` (cosine distance, lower = more similar) → `WHERE` keeps only distance ≤ 0.5 → `ORDER BY distance` (closest first) → `LIMIT top_k` (a maximum: can return fewer, and doesn't guarantee the right chunks) → `JOIN documents` to get `source` for citations. The embedding is passed twice: once for the distance column, once for the `WHERE`.
+
+**Proved by:** Normal settings (top_k 2, threshold 0.5): Kube → only chunk 0 (0.215); Ollama → only chunk 0 (0.405). Loosened (top_k 10, threshold 1.0): the answer chunks ranked 2nd — Kube Mitigation 0.554, Ollama port 0.521. So the ranking is right; the threshold alone cut them. France → `[]` (correct rejection).
+
+**Also found:** crashloop.md chunks show `'\\n'` in repr, meaning a literal backslash + n is stored, not a real line break. This adds junk to the embedding. Fix: correct the file and upload it again (replace policy → "replaced").
+
 ---
 
 ## Known issues / open items
