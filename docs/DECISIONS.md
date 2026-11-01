@@ -167,6 +167,19 @@ Other exceptions are NOT caught (a DB down is an honest 500). The endpoint uses 
 
 **Open:** `repeat_penalty` changed the alert name in the answer ("kubepodcrashloop"). Check exact identifiers in the Phase 3b evals before keeping it.
 
+## 012 — `POST /ask` endpoint
+
+**Problem:** Search, context and generation existed separately; nothing answered a question end to end. Failures from different layers (bad question, bad model output, slow model) needed different responses. When the model refused, it wrote `"refused"` instead of the exact refusal sentence, because `repeat_penalty` penalizes words that already appear in the prompt.
+
+**Decision:** `POST /ask` with a JSON body (`AskRequest`). Refuse **before** the LLM when retrieval returns nothing (fast, free, can't make anything up). Status codes per layer: `ValueError` → 400, `GenerationError` → 502, `httpx.TimeoutException` → 504, anything else → 500. Return `sources` (only the cited chunks) so the frontend can show the evidence. When `refused` is true, the code sets the answer to `REFUSAL` instead of trusting the model's wording.
+
+**Why not:** `GET /ask?q=` — questions can be long and end up in URLs, history and logs. Calling the LLM with an empty context — the model would answer from its own memory.
+
+**Recipe:** validate → `search_chunks` → no chunks? return refusal → `generate_answer` → map errors to 400/502/504 → `sources` = retrieved chunks whose id is in `citations` → return `{**result, "sources": sources}`.
+
+**Proved by:** Ollama port question (only chunk 8 retrieved) → refused with the full sentence, both before and after the fix. Empty question → 400 (test). 15 tests passing.
+
+**Open:** the app refuses questions it should answer (port, Kube fix) because of the retrieval gap in 010. Phase 3b evals will measure how often.
 ---
 
 ## Known issues / open items
