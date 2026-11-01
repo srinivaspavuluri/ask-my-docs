@@ -7,6 +7,7 @@ from app.config import OLLAMA_HOST
 from app.db import get_db_connection
 from app.ingestion import ingest_document
 from app.documents import list_documents, remove_document
+from app.retrieval import search_chunks
 
 
 ollama_client = Client(host=OLLAMA_HOST)
@@ -53,6 +54,15 @@ def delete_document(document_id: int):
     if not deleted_doc_id:
         raise HTTPException(status_code=404, detail="Document not found.")
     return Response(status_code=204)
+
+@app.get("/search")
+def search(q: str):
+    try:
+        search_query = search_chunks(q)
+        return search_query
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
 
 @app.get("/health")
 def health_check():
