@@ -72,7 +72,7 @@ def generate_answer(question: str, chunks: list[dict]) -> dict:
     citations = clean_citations(parsed_answer.citations, allowed_ids, parsed_answer.refused)
     
     return {
-        "answer" : parsed_answer.answer,
+        "answer" : REFUSAL if parsed_answer.refused else parsed_answer.answer,
         "citations" : citations,
         "refused" : parsed_answer.refused
     }

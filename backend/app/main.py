@@ -1,14 +1,16 @@
 
 import os
+import httpx
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Response
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from ollama import Client
 from app.config import OLLAMA_HOST
 from app.db import get_db_connection
 from app.ingestion import ingest_document
 from app.documents import list_documents, remove_document
 from app.retrieval import search_chunks
-
+from app.generation import REFUSAL, GenerationError, generate_answer
 
 ollama_client = Client(host=OLLAMA_HOST)
 MAX_UPLOAD_BYTES = 1 * 1024 * 1024
@@ -18,6 +20,38 @@ app = FastAPI(title="Ask My Docs",
               description=("A grounded question-answering API using PostgreSQL, pgvector and Ollama."),
                   version="1.0.0"
               )
+
+class AskRequest(BaseModel):
+    question : str
+
+
+@app.post("/ask")
+def ask(request:AskRequest):
+    try:
+        chunks = search_chunks(request.question)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not chunks:
+        return {
+            "answer" : REFUSAL,
+            "citations" : [],
+            "refused" : True,
+            "sources" : []
+        }
+
+    try:
+        result = generate_answer(request.question, chunks)
+    except GenerationError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="The model took too long to answer.")
+
+    sources = [chunk for chunk in chunks if chunk["chunk_id"] in result["citations"]]
+    return {
+        **result,
+        "sources" : sources
+    }
 
 
 @app.post("/documents")
