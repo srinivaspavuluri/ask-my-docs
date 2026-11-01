@@ -153,6 +153,20 @@ Other exceptions are NOT caught (a DB down is an honest 500). The endpoint uses 
 
 **Also found:** crashloop.md chunks show `'\\n'` in repr, meaning a literal backslash + n is stored, not a real line break. This adds junk to the embedding. Fix: correct the file and upload it again (replace policy → "replaced").
 
+## 011 — Structured JSON output from the LLM
+
+**Problem:** We need citations that code can check, so the model must return JSON (`{answer, citations, refused}`) instead of free text. With forced JSON (`format=` schema), the Kube question looped inside `citations` (`15, 13, 14, 15, 13, 14...`) until the 300-token limit cut it off → invalid JSON → crash after 1m31s.
+
+**Decision:** Keep JSON, but contain the failure: `Field(max_length=5)` on citations (the schema forces the list to close), `repeat_penalty: 1.2` (stops the loop at the source), `clean_citations()` (drops ids that weren't retrieved, removes duplicates, keeps order, empty when refused), `GenerationError` when output still doesn't parse, and limits on every model call (`timeout=90`, `num_predict=300`).
+
+**Why not:** Free text — it worked (10 s, correct answer) but citations would be words in a sentence that code can't reliably check.
+
+**Recipe:** build context with `[Chunk id | source]` labels → prompt with rules → `ollama_client.chat(format=AnswerModel schema, temperature 0, num_predict 300, repeat_penalty 1.2)` → parse with Pydantic (fail → `GenerationError`) → `clean_citations(raw, allowed_ids, refused)` → return the dict.
+
+**Proved by:** Same question and chunks without `format=` → clean answer in 10 s, so forced JSON was the trigger, not the data. With `max_length=5` → valid JSON but repeated ids `[15, 13, 14, 15, 13]`. With `repeat_penalty` → `[13, 15]` in 24 s. `clean_citations` tests: duplicates removed, invented ids dropped, empty when refused. With the right chunk in context, the Ollama question answered "11434" citing only chunk 9; with the wrong chunks, it refused.
+
+**Open:** `repeat_penalty` changed the alert name in the answer ("kubepodcrashloop"). Check exact identifiers in the Phase 3b evals before keeping it.
+
 ---
 
 ## Known issues / open items
