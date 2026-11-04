@@ -1,9 +1,11 @@
 from ollama import Client
 from pydantic import BaseModel, ValidationError, Field
-from app.config import LLM_MODEL, OLLAMA_HOST
+from app.config import LLM_MODEL, OLLAMA_HOST, PROMPT_VERSION
+from app.prompts import load_prompt
 
 ollama_client = Client(host=OLLAMA_HOST, timeout=90)
 REFUSAL = "The runbooks don't contain enough information to answer this."
+PROMPT_TEMPLATE = load_prompt(PROMPT_VERSION)
 
 class GenerationError(Exception):
     """The model returned output we couldn't use."""
@@ -12,21 +14,6 @@ class AnswerModel(BaseModel):
     answer : str
     citations : list[int] = Field(max_length=5)
     refused: bool
-
-
-PROMPT_TEMPLATE = """You are an on-call assistant. Answer ONLY from the runbook context below.
-
-Rules:
-- Use only facts stated in the context. No outside knowledge.
-- In "citations", list the chunk IDs (the numbers after "Chunk") that support your answer.
-- If the context does not contain the answer, set "refused" to true, "citations" to [],
-  and "answer" to exactly: "{refusal}"
-
-Context:
-{context}
-
-Question: {question}
-"""
 
 
 def build_context(chunks: list[dict]) -> str:
@@ -74,6 +61,7 @@ def generate_answer(question: str, chunks: list[dict]) -> dict:
     return {
         "answer" : REFUSAL if parsed_answer.refused else parsed_answer.answer,
         "citations" : citations,
-        "refused" : parsed_answer.refused
+        "refused" : parsed_answer.refused,
+        "prompt_version" : PROMPT_VERSION
     }
 

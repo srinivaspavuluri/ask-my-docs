@@ -14,3 +14,5 @@ LLM_MODEL = os.getenv("LLM_MODEL", "phi4-mini")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 RAG_THRESHOLD = float(os.getenv("RAG_THRESHOLD", "0.5"))
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "2"))
+PROMPT_VERSION = os.getenv("PROMPT_VERSION", "answer_v1")
+
