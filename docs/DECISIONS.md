@@ -180,6 +180,21 @@ Other exceptions are NOT caught (a DB down is an honest 500). The endpoint uses 
 **Proved by:** Ollama port question (only chunk 8 retrieved) → refused with the full sentence, both before and after the fix. Empty question → 400 (test). 15 tests passing.
 
 **Open:** the app refuses questions it should answer (port, Kube fix) because of the retrieval gap in 010. Phase 3b evals will measure how often.
+
+## 013 — Prompt as a versioned file
+
+**Problem:** The prompt was a string inside `generation.py`. Any edit silently changed behavior, there was no record of which prompt produced which answer, and eval results from before and after an edit couldn't be compared.
+
+**Decision:** Each prompt version is a separate file in `backend/prompts/` (`answer_v1.txt`) that is never edited after use; a change means a new file (`answer_v2.txt`). `PROMPT_VERSION` in `.env` picks the active one (default `answer_v1`). `app/prompts.py` loads it once at import, so a missing file stops the app at startup instead of failing on the first `/ask`. `generate_answer` returns `prompt_version`, which will be logged with every request (3.4).
+
+**Why not:** Keeping the prompt in code — no history, and editing it means editing code. Reading the file on every request — slower, and a missing file would only show up when a user asks a question.
+
+**Recipe:** `load_prompt(version)` → `PROMPTS_DIR / f"{version}.txt"` → missing → `FileNotFoundError` → `read_text` → `PROMPT_TEMPLATE.format(refusal=..., context=..., question=...)`. Literal braces in a future prompt must be doubled (`{{ }}`).
+
+**Proved by:** Editing the file changed the loaded text (the file is really used; the old hard-coded string had been overwriting it until removed). Tests: all three placeholders present, formatting fills them (using unique markers), missing version raises. Behavior of `/ask` unchanged: refactor only; 18 tests passing.
+
+**Lesson:** `assert "a" and "b" in x` only checks `"b"`; write one `assert` per fact. Test values must be unique markers (`"C"` matched "Context" in the prompt itself).
+
 ---
 
 ## Known issues / open items
