@@ -26,3 +26,24 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
     CONSTRAINT document_chunks_document_fk FOREIGN KEY (document_id)
         REFERENCES public.documents(id) ON DELETE CASCADE
 );
+
+-- 002: one row per /ask request (observability).
+
+CREATE TABLE IF NOT EXISTs public.query_logs (
+    id                  BIGSERIAL PRIMARY KEY,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    question            TEXT NOT NULL,
+    outcome             TEXT NOT NULL CHECK (outcome IN ('answered', 'refused', 'error')),
+    error_type          TEXT,
+    answer              TEXT,
+    retrieved_chunk_ids BIGINT[] NOT NULL DEFAULT '{}',
+    top_distance        REAL,
+    citations           BIGINT[] NOT NULL DEFAULT '{}',
+    prompt_version      TEXT,
+    llm_model           TEXT,
+    retrieval_ms        INTEGER,
+    generation_ms       INTEGER,
+    total_ms            INTEGER NOT NULL
+);
+
+CREATE INDEX query_logs_created_at_idx ON public.query_logs (created_at DESC);
