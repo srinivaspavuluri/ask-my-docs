@@ -195,6 +195,20 @@ Other exceptions are NOT caught (a DB down is an honest 500). The endpoint uses 
 
 **Lesson:** `assert "a" and "b" in x` only checks `"b"`; write one `assert` per fact. Test values must be unique markers (`"C"` matched "Context" in the prompt itself).
 
+## 014 — Logging every `/ask` (query_logs)
+
+**Problem:** Evals only cover questions I wrote; real failures, refusals and slow requests were invisible. Once logging existed, unexpected errors showed only `outcome = error` with nothing else (row 5): no exception type, no message, and no way to link a user's error to its log row.
+
+**Decision:** One row per `/ask` in `query_logs` (migration 002), written in the outer `finally` so every path is logged. `outcome` starts as `"error"` and is overwritten only on success, so a crash can never look like a success. `CHECK` limits outcome to answered/refused/error; details go in `error_type`. Timings per stage with `time.perf_counter()`. `log_query()` catches every exception but records it with `logger.exception` — logging must never break `/ask`. Migration 003 adds `request_id` (UUID, also returned in the `X-Request-ID` header) and `error_detail` (exception type + message). A catch-all labels unexpected errors and re-raises them (still a 500).
+
+**Why not:** Logging just before each return — the 4 error paths would be missing. Putting the real error in the response — it exposes internals (table names, hosts) once the API is public; full details stay in the log, the user gets a short message and the request id.
+
+**Recipe:** at the start: `start`, `request_id`, `entry = {question, outcome: "error", request_id}` → each step adds its fields → handled errors set `error_type` + `error_detail` and raise with the header → `except HTTPException: raise` before `except Exception` → outer `finally`: `total_ms`, `log_query(entry)`.
+
+**Proved by:** Row 5 caught a real bug (crash between recording retrieval time and chunk ids) before I knew about it. Row 6: generation 30 479 ms of 30 540 ms total (99.8%) — the model, not the DB, is the bottleneck. Rows 8–10: every row has a `request_id`, errors have `error_detail` ("Question cannot be empty."); the `x-request-id` header of the empty question matched row 10. The invalid `'timeout'` outcome was rejected by the CHECK constraint. 18 tests passing.
+
+**Lesson:** In SQL, `'single quotes'` are values and `"double quotes"` are names. A `finally` may only use variables that exist on every path. `ADD COLUMN` appends at the end of the table — always name columns, never rely on position.
+
 ---
 
 ## Known issues / open items
