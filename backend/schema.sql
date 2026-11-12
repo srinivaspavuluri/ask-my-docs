@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTs public.query_logs (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     question            TEXT NOT NULL,
     outcome             TEXT NOT NULL CHECK (outcome IN ('answered', 'refused', 'error')),
+    request_id          UUID,
     error_type          TEXT,
+    error_detail        TEXT,
     answer              TEXT,
     retrieved_chunk_ids BIGINT[] NOT NULL DEFAULT '{}',
     top_distance        REAL,
@@ -46,4 +48,5 @@ CREATE TABLE IF NOT EXISTs public.query_logs (
     total_ms            INTEGER NOT NULL
 );
 
-CREATE INDEX query_logs_created_at_idx ON public.query_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS query_logs_created_at_idx ON public.query_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS query_logs_request_id_idx ON public.query_logs (request_id);

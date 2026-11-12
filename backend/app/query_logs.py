@@ -5,11 +5,11 @@ logger = logging.getLogger(__name__)
 
 INSERT_QUERY = """
 INSERT INTO public.query_logs (
-    question, outcome, error_type, answer,
+    question, outcome, request_id, error_type, error_detail, answer,
     retrieved_chunk_ids, top_distance, citations,
     prompt_version, llm_model,
     retrieval_ms, generation_ms, total_ms
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
 """
 
 def log_query(entry: dict) -> None:
@@ -17,7 +17,7 @@ def log_query(entry: dict) -> None:
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
-            cursor.execute(INSERT_QUERY, (entry.get("question"), entry.get("outcome"), entry.get("error_type"), entry.get("answer"), entry.get("retrieved_chunk_ids", []), entry.get("top_distance"), entry.get("citations", []), entry.get("prompt_version"), entry.get("llm_model"), entry.get("retrieval_ms"), entry.get("generation_ms"), entry.get("total_ms")))
+            cursor.execute(INSERT_QUERY, (entry.get("question"), entry.get("outcome"), entry.get("request_id"), entry.get("error_type"), entry.get("error_detail"), entry.get("answer"), entry.get("retrieved_chunk_ids", []), entry.get("top_distance"), entry.get("citations", []), entry.get("prompt_version"), entry.get("llm_model"), entry.get("retrieval_ms"), entry.get("generation_ms"), entry.get("total_ms")))
         connection.commit()
     except Exception:
         logger.exception("Failed to write query log")
