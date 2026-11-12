@@ -1,16 +1,19 @@
 
 import os
 import httpx
+import time
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from ollama import Client
-from app.config import OLLAMA_HOST
+from app.config import OLLAMA_HOST, LLM_MODEL, PROMPT_VERSION
 from app.db import get_db_connection
 from app.ingestion import ingest_document
 from app.documents import list_documents, remove_document
 from app.retrieval import search_chunks
 from app.generation import REFUSAL, GenerationError, generate_answer
+from app.query_logs import log_query
+
 
 ollama_client = Client(host=OLLAMA_HOST)
 MAX_UPLOAD_BYTES = 1 * 1024 * 1024
@@ -24,34 +27,54 @@ app = FastAPI(title="Ask My Docs",
 class AskRequest(BaseModel):
     question : str
 
+def elapsed_ms(since: float) -> int:
+    return int((time.perf_counter() - since) * 1000)
 
 @app.post("/ask")
-def ask(request:AskRequest):
+def ask(request: AskRequest):
+    start = time.perf_counter()
+    entry = {"question": request.question, "outcome": "error"}
     try:
-        chunks = search_chunks(request.question)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # --- retrieval ---
+        t0 = time.perf_counter()
+        try:
+            chunks = search_chunks(request.question)
+        except ValueError as e:
+            entry["error_type"] = "invalid_question"
+            raise HTTPException(status_code=400, detail=str(e))
+        entry["retrieval_ms"] = elapsed_ms(t0)
+        entry["retrieved_chunk_ids"] = [chunk["chunk_id"] for chunk in chunks]
+        entry["top_distance"] = chunks[0]["distance"] if chunks else None
 
-    if not chunks:
-        return {
-            "answer" : REFUSAL,
-            "citations" : [],
-            "refused" : True,
-            "sources" : []
-        }
+        # --- early refusal ---
+        if not chunks:
+            entry["outcome"] = "refused"
+            entry["answer"] = REFUSAL
+            return {"answer": REFUSAL, "citations": [], "refused": True, "sources": []}
 
-    try:
-        result = generate_answer(request.question, chunks)
-    except GenerationError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="The model took too long to answer.")
-
-    sources = [chunk for chunk in chunks if chunk["chunk_id"] in result["citations"]]
-    return {
-        **result,
-        "sources" : sources
-    }
+        # --- generation ---
+        entry["prompt_version"] = PROMPT_VERSION
+        entry["llm_model"] = LLM_MODEL
+        t1 = time.perf_counter()
+        try:
+            result = generate_answer(request.question, chunks)
+        except GenerationError as e:
+            entry["error_type"] = "invalid_output"
+            raise HTTPException(status_code=502, detail=str(e))
+        except httpx.TimeoutException:
+            entry["error_type"] = "timeout"
+            raise HTTPException(status_code=504, detail="The model took too long to answer.")
+        finally:
+            entry["generation_ms"] = elapsed_ms(t1)
+            
+        entry["outcome"] = "refused" if result["refused"] else "answered"
+        entry["answer"] = result["answer"]
+        entry["citations"] = result["citations"]
+        sources = [chunk for chunk in chunks if chunk["chunk_id"] in result["citations"]]
+        return {**result, "sources": sources}
+    finally:
+        entry["total_ms"] = elapsed_ms(start)
+        log_query(entry)
 
 
 @app.post("/documents")
