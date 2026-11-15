@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "description": "Gold set for Ask My Docs (runbook assistant). expected_source = documents.source; must_contain = case-insensitive substrings that a correct answer must include and that are not in the question.",
+  "questions": [
+    {
+      "id": "q01",
+      "category": "exact_identifier",
+      "question": "Checkout requests are timing out and the DB dashboard shows 40/40 connections. What's happening?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApiDbPoolExhausted.md",
+      "expected_section": "Meaning",
+      "must_contain": [
+        "DB_POOL_MAX"
+      ]
+    },
+    {
+      "id": "q02",
+      "category": "exact_identifier",
+      "question": "Checkout is timing out because the connection pool is full. Can I just raise the pool size to 100?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApiDbPoolExhausted.md",
+      "expected_section": "Mitigation",
+      "must_contain": [
+        "60"
+      ]
+    },
+    {
+      "id": "q03",
+      "category": "exact_identifier",
+      "question": "Checkout started returning 502s right after we deployed payments-api. How do I undo the deploy?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApi5xxAfterDeploy.md",
+      "expected_section": "Mitigation",
+      "must_contain": [
+        "rollout undo"
+      ]
+    },
+    {
+      "id": "q04",
+      "category": "exact_identifier",
+      "question": "The new payments-api pods after the deploy never become ready. Which port does their readiness probe use?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApi5xxAfterDeploy.md",
+      "expected_section": "Diagnosis",
+      "must_contain": [
+        "8443"
+      ]
+    },
+    {
+      "id": "q05",
+      "category": "exact_identifier",
+      "question": "I just rolled back payments-api after a bad deploy. Is there anything else I'm supposed to do?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApi5xxAfterDeploy.md",
+      "expected_section": "Mitigation",
+      "must_contain": [
+        "#payments-oncall"
+      ]
+    },
+    {
+      "id": "q06",
+      "category": "exact_identifier",
+      "question": "Our payments-api error rate is still above 2% ten minutes after I rolled back. Who do I contact?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApi5xxAfterDeploy.md",
+      "expected_section": "Mitigation",
+      "must_contain": [
+        "payments team lead"
+      ]
+    },
+    {
+      "id": "q07",
+      "category": "exact_identifier",
+      "question": "The card provider seems slow and only the /v1/charge endpoint is affected. Is there a quick way to keep checkout working?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApiHighLatency.md",
+      "expected_section": "Mitigation",
+      "must_contain": [
+        "payments.fallback_provider"
+      ]
+    },
+    {
+      "id": "q08",
+      "category": "section",
+      "question": "Customers say checkout is slow. p95 latency has been around 900 ms for the last ten minutes. What should I look at first?",
+      "answerable": true,
+      "expected_source": "custom/PaymentsApiHighLatency.md",
+      "expected_section": "Diagnosis",
+      "must_contain": [
+        "Payments / Latency"
+      ]
+    },
+    {
+      "id": "q09",
+      "category": "section",
+      "question": "kubectl shows my pod restarting again and again a few seconds after it starts. Where should I start looking?",
+      "answerable": true,
+      "expected_source": "prometheus/KubePodCrashLooping.md",
+      "expected_section": "Diagnosis",
+      "must_contain": [
+        "describe pod"
+      ]
+    },
+    {
+      "id": "q10",
+      "category": "section",
+      "question": "One of our Kubernetes nodes is marked as not ready. How do I find out why?",
+      "answerable": true,
+      "expected_source": "prometheus/KubeNodeNotReady.md",
+      "expected_section": "Diagnosis",
+      "must_contain": [
+        "kubectl get node"
+      ]
+    },
+    {
+      "id": "q11",
+      "category": "section",
+      "question": "A scheduled batch job failed overnight. How do I inspect what went wrong with it?",
+      "answerable": true,
+      "expected_source": "prometheus/KubeJobFailed.md",
+      "expected_section": "Diagnosis",
+      "must_contain": [
+        "describe jobs"
+      ]
+    },
+    {
+      "id": "q12",
+      "category": "similar_docs",
+      "question": "My pod is stuck and never even starts. It's not restarting, it just sits there waiting. Which runbook is this?",
+      "answerable": true,
+      "expected_source": "prometheus/KubeContainerWaiting.md",
+      "expected_section": "Meaning",
+      "must_contain": [
+        "KubeContainerWaiting"
+      ],
+      "note": "Look-alikes: KubePodCrashLooping, KubePodNotReady"
+    },
+    {
+      "id": "q13",
+      "category": "similar_docs",
+      "question": "The disk on one of our Kubernetes nodes is almost full. Which runbook covers this?",
+      "answerable": true,
+      "expected_source": "prometheus/NodeFilesystemSpaceFillingUp.md",
+      "expected_section": "Meaning",
+      "must_contain": [
+        "NodeFilesystemSpaceFillingUp"
+      ],
+      "note": "Look-alike: KubePersistentVolumeFillingUp"
+    },
+    {
+      "id": "q14",
+      "category": "similar_docs",
+      "question": "The storage volume attached to our database pod is almost full. What's the fastest and cheapest fix?",
+      "answerable": true,
+      "expected_source": "prometheus/KubePersistentVolumeFillingUp.md",
+      "expected_section": "Mitigation",
+      "must_contain": [
+        "retention"
+      ],
+      "note": "Look-alike: NodeFilesystemSpaceFillingUp"
+    },
+    {
+      "id": "q15",
+      "category": "similar_docs",
+      "question": "A pod shows Running, but the service isn't sending it any traffic. Which runbook covers this?",
+      "answerable": true,
+      "expected_source": "prometheus/KubePodNotReady.md",
+      "expected_section": "Meaning",
+      "must_contain": [
+        "KubePodNotReady"
+      ],
+      "note": "Look-alikes: KubePodCrashLooping, KubeContainerWaiting"
+    },
+    {
+      "id": "q16",
+      "category": "unanswerable",
+      "question": "What is the phone number for the payments-api on-call engineer?",
+      "answerable": false,
+      "expected_source": null,
+      "expected_section": null,
+      "must_contain": [],
+      "note": "tempting: sounds like a payments runbook fact"
+    },
+    {
+      "id": "q17",
+      "category": "unanswerable",
+      "question": "What is the capital of France?",
+      "answerable": false,
+      "expected_source": null,
+      "expected_section": null,
+      "must_contain": [],
+      "note": "off-topic"
+    },
+    {
+      "id": "q18",
+      "category": "unanswerable",
+      "question": "How do I restart a Kafka broker?",
+      "answerable": false,
+      "expected_source": null,
+      "expected_section": null,
+      "must_contain": [],
+      "note": "in-domain but missing; Kafka is only mentioned as an example in KubePersistentVolumeFillingUp"
+    },
+    {
+      "id": "q19",
+      "category": "unanswerable",
+      "question": "Which team owns the contract with the card provider?",
+      "answerable": false,
+      "expected_source": null,
+      "expected_section": null,
+      "must_contain": [],
+      "note": "tempting: payments-related, not in any runbook"
+    },
+    {
+      "id": "q20",
+      "category": "unanswerable",
+      "question": "How do I rotate the payments-api database password?",
+      "answerable": false,
+      "expected_source": null,
+      "expected_section": null,
+      "must_contain": [],
+      "note": "in-domain but missing"
+    }
+  ]
+}
