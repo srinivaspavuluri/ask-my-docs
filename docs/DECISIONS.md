@@ -209,6 +209,20 @@ Other exceptions are NOT caught (a DB down is an honest 500). The endpoint uses 
 
 **Lesson:** In SQL, `'single quotes'` are values and `"double quotes"` are names. A `finally` may only use variables that exist on every path. `ADD COLUMN` appends at the end of the table — always name columns, never rely on position.
 
+## 015 — Runbook corpus for evals
+
+**Problem:** The database held three tiny test files (ollama.txt, runbook.txt, crashloop.md with literal "\n"). Evals on them would measure nothing: no realistic structure, no similar documents that could confuse retrieval, and junk data mixed in.
+
+**Decision:** Deleted the test documents. Corpus = 10 Prometheus Operator runbooks (Apache-2.0, LICENSE copied alongside) chosen to include look-alikes (CrashLooping / ContainerWaiting / PodNotReady; two "FillingUp" alerts), plus 3 runbooks for a fictional `payments-api`, marked as fictional, to simulate internal docs with exact values (DB_POOL_MAX, 8443, kubectl commands). Loaded by `backend/scripts/load_corpus.py`, which calls `ingest_document()` directly. `source` = path relative to `data/runbooks/` (e.g. `prometheus/KubePodCrashLooping.md`) so files with the same name in different folders can't replace each other.
+
+**Why not:** Uploading through `POST /documents` — needs uvicorn running; fine for users, unnecessary for my own corpus. Plain file names as `source` — a name collision would silently replace a document. Fixing the chunker first — the baseline must measure today's chunker.
+
+**Recipe:** `CORPUS_DIR = parents[2] / "data" / "runbooks"` → `rglob("*.md")` (LICENSE skipped) → `relative_to(...).as_posix()` as source → `ingest_document` → print status per file.
+
+**Proved by:** First run: 13 ingested, 211 chunks. Second run: 13 skipped (re-runnable). `KubePodCrashLooping.md` → 13 chunks, 7 of them with no instructions (front-matter, title, headings, a label cut from its list); the Mitigation text is in a different chunk from its heading and doesn't mention the alert name.
+
+**Lesson:** `parents[n]` counts from the file's own location: the script inside `app/` pointed one level too low and would have silently found no files.
+
 ---
 
 ## Known issues / open items
